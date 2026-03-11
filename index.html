@@ -1981,6 +1981,7 @@ async function syncGist() {
     const content = JSON.stringify(payload, null, 2);
 
     if (!DB.gist.gistId) {
+      // Create new gist
       const res = await fetch('https://api.github.com/gists', {
         method: 'POST',
         headers: ghHeaders,
@@ -1992,12 +1993,14 @@ async function syncGist() {
         document.getElementById('gist-id').value = data.id;
         saveDB();
         setSyncStatus('ok');
-        updateSyncStatusText('✅ 同步成功（已建立新 Gist）');
+        updateSyncStatusText(t('✅ 同步成功（已建立新 Gist）','✅ Sync success (new Gist created)'));
       } else {
-        const msg = data.message || JSON.stringify(data);
+        // Show real GitHub error
+        const msg = data.message || data.errors?.[0]?.message || JSON.stringify(data);
         throw new Error('GitHub: ' + msg);
       }
     } else {
+      // Fetch remote first for bidirectional merge
       const fetchRes = await fetch(`https://api.github.com/gists/${DB.gist.gistId}`, {
         headers: ghHeaders
       });
@@ -2007,12 +2010,17 @@ async function syncGist() {
       }
       const remoteData = await fetchRes.json();
       const remoteRaw = remoteData.files?.[GIST_FILENAME]?.content;
+
       if (remoteRaw) {
         try {
           const remote = JSON.parse(remoteRaw);
-          if (remote.opportunities) mergeBidirectional(remote.opportunities);
+          if (remote.opportunities) {
+            mergeBidirectional(remote.opportunities);
+          }
         } catch(e) {}
       }
+
+      // Push merged data
       const mergedPayload = { v:1, at: new Date().toISOString(), opportunities: DB.opportunities, lang: DB.lang };
       const patchRes = await fetch(`https://api.github.com/gists/${DB.gist.gistId}`, {
         method: 'PATCH',
@@ -2024,7 +2032,7 @@ async function syncGist() {
         saveDB();
         renderHome();
         renderNotesOppSelect();
-        updateSyncStatusText('✅ 上次同步：' + new Date().toLocaleTimeString());
+        updateSyncStatusText(t('✅ 上次同步：','✅ Last sync: ') + new Date().toLocaleTimeString());
       } else {
         const errData = await patchRes.json().catch(() => ({}));
         throw new Error('GitHub: ' + (errData.message || patchRes.status));
@@ -2032,7 +2040,7 @@ async function syncGist() {
     }
   } catch(e) {
     setSyncStatus('err');
-    updateSyncStatusText('❌ 同步失敗：' + e.message);
+    updateSyncStatusText(t('❌ 同步失敗：','❌ Sync failed: ') + e.message);
     console.error('Sync error:', e);
   }
 }
