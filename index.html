@@ -784,6 +784,7 @@ let DB = {
   gist: { token: '', gistId: '' },
   currentOppId: null,
   opportunities: [],
+  updatedAt: new Date().toISOString(), // timestamp for last-write-wins sync
 };
 
 let syncTimer = null;
@@ -811,6 +812,13 @@ function initApp() {
     navigator.serviceWorker.register('sw.js').catch(()=>{});
   }
   initDragScroll(document.getElementById('filter-chips'));
+
+  // 離開頁面時自動同步（關閉分頁、切換分頁、手機按 Home 鍵）
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && DB.gist.token && DB.gist.gistId) {
+      syncGist();
+    }
+  });
 }
 
 // ─── DRAG SCROLL ─────────────────────────────────────
@@ -849,6 +857,7 @@ function initDragScroll(el) {
 
 // ─── PERSISTENCE ────────────────────────────────────
 function saveDB() {
+  DB.updatedAt = new Date().toISOString(); // stamp every save
   try { localStorage.setItem(DB_KEY, JSON.stringify(DB)); } catch(e){}
   scheduleSyncGist();
 }
@@ -1974,16 +1983,11 @@ function resetGistId() {
 }
 
 function scheduleSyncGist() {
-  if (!DB.gist.token) return;
-  clearTimeout(syncTimer);
-  syncTimer = setTimeout(syncGist, 3000);
+  // 已停用自動同步，改為手動同步
 }
 
 async function syncGist() {
-  if (!DB.gist.token) {
-    setSyncStatus('idle');
-    return;
-  }
+  if (!DB.gist.token) { setSyncStatus('idle'); return; }
   setSyncStatus('busy');
 
   const ghHeaders = {
@@ -1994,71 +1998,74 @@ async function syncGist() {
   };
 
   try {
-    const payload = { v:1, at: new Date().toISOString(), opportunities: DB.opportunities, lang: DB.lang };
-    const content = JSON.stringify(payload, null, 2);
+    // ── 有 gistId：先拉遠端，比較時間戳，新的覆蓋舊的 ──
+    if (DB.gist.gistId) {
+      const fetchRes = await fetch(`https://api.github.com/gists/${DB.gist.gistId}`, { headers: ghHeaders });
 
-    if (!DB.gist.gistId) {
-      // Create new gist
-      const res = await fetch('https://api.github.com/gists', {
-        method: 'POST',
-        headers: ghHeaders,
-        body: JSON.stringify({ description: 'SBP App Data', public: false, files: { [GIST_FILENAME]: { content } } })
-      });
-      const data = await res.json();
-      if (data.id) {
-        DB.gist.gistId = data.id;
-        document.getElementById('gist-id').value = data.id;
-        saveDB();
-        setSyncStatus('ok');
-        updateSyncStatusText(t('✅ 同步成功（已建立新 Gist）','✅ Sync success (new Gist created)'));
-      } else {
-        // Show real GitHub error
-        const msg = data.message || data.errors?.[0]?.message || JSON.stringify(data);
-        throw new Error('GitHub: ' + msg);
+      if (fetchRes.ok) {
+        const remoteData = await fetchRes.json();
+        const remoteRaw = remoteData.files?.[GIST_FILENAME]?.content;
+
+        if (remoteRaw) {
+          try {
+            const remote = JSON.parse(remoteRaw);
+            const remoteTime = remote.updatedAt ? new Date(remote.updatedAt) : new Date(0);
+            const localTime  = DB.updatedAt     ? new Date(DB.updatedAt)     : new Date(0);
+
+            if (remoteTime > localTime) {
+              // 遠端比較新 → 用遠端資料覆蓋本機（保留 gist 設定）
+              const savedGist = DB.gist;
+              DB = { ...remote, gist: savedGist };
+              DB.gist = savedGist;
+              try { localStorage.setItem(DB_KEY, JSON.stringify(DB)); } catch(e){}
+              renderHome();
+              renderNotesOppSelect();
+              setSyncStatus('ok');
+              updateSyncStatusText('✅ ' + t('已從雲端更新（遠端較新）','Updated from cloud (remote newer)') + ' ' + new Date().toLocaleTimeString());
+              return;
+            }
+            // 本機比較新 → push 本機到遠端（繼續往下）
+          } catch(e) {}
+        }
+
+        // Push 本機到遠端
+        const content = JSON.stringify({ v:1, updatedAt: DB.updatedAt, opportunities: DB.opportunities, lang: DB.lang }, null, 2);
+        const patchRes = await fetch(`https://api.github.com/gists/${DB.gist.gistId}`, {
+          method: 'PATCH', headers: ghHeaders,
+          body: JSON.stringify({ files: { [GIST_FILENAME]: { content } } })
+        });
+        if (patchRes.ok) {
+          setSyncStatus('ok');
+          updateSyncStatusText('✅ ' + t('已上傳到雲端','Pushed to cloud') + ' ' + new Date().toLocaleTimeString());
+          return;
+        }
       }
+      // fetch 或 patch 失敗（Gist 不存在）→ 清空重建
+      DB.gist.gistId = '';
+      const el = document.getElementById('gist-id');
+      if (el) el.value = '';
+    }
+
+    // ── 建立新 Gist ──
+    const content = JSON.stringify({ v:1, updatedAt: DB.updatedAt, opportunities: DB.opportunities, lang: DB.lang }, null, 2);
+    const res = await fetch('https://api.github.com/gists', {
+      method: 'POST', headers: ghHeaders,
+      body: JSON.stringify({ description: 'SBP App Data', public: false, files: { [GIST_FILENAME]: { content } } })
+    });
+    const data = await res.json();
+    if (data.id) {
+      DB.gist.gistId = data.id;
+      const el = document.getElementById('gist-id');
+      if (el) el.value = data.id;
+      try { localStorage.setItem(DB_KEY, JSON.stringify(DB)); } catch(e){}
+      setSyncStatus('ok');
+      updateSyncStatusText('✅ ' + t('同步成功（已建立新 Gist）','Sync success (new Gist created)'));
     } else {
-      // Fetch remote first for bidirectional merge
-      const fetchRes = await fetch(`https://api.github.com/gists/${DB.gist.gistId}`, {
-        headers: ghHeaders
-      });
-      if (!fetchRes.ok) {
-        const errData = await fetchRes.json().catch(() => ({}));
-        throw new Error('GitHub: ' + (errData.message || fetchRes.status));
-      }
-      const remoteData = await fetchRes.json();
-      const remoteRaw = remoteData.files?.[GIST_FILENAME]?.content;
-
-      if (remoteRaw) {
-        try {
-          const remote = JSON.parse(remoteRaw);
-          if (remote.opportunities) {
-            mergeBidirectional(remote.opportunities);
-          }
-        } catch(e) {}
-      }
-
-      // Push merged data
-      const mergedPayload = { v:1, at: new Date().toISOString(), opportunities: DB.opportunities, lang: DB.lang };
-      const patchRes = await fetch(`https://api.github.com/gists/${DB.gist.gistId}`, {
-        method: 'PATCH',
-        headers: ghHeaders,
-        body: JSON.stringify({ files: { [GIST_FILENAME]: { content: JSON.stringify(mergedPayload, null, 2) } } })
-      });
-      if (patchRes.ok) {
-        setSyncStatus('ok');
-        saveDB();
-        renderHome();
-        renderNotesOppSelect();
-        updateSyncStatusText(t('✅ 上次同步：','✅ Last sync: ') + new Date().toLocaleTimeString());
-      } else {
-        const errData = await patchRes.json().catch(() => ({}));
-        throw new Error('GitHub: ' + (errData.message || patchRes.status));
-      }
+      throw new Error('GitHub: ' + (data.message || JSON.stringify(data)));
     }
   } catch(e) {
     setSyncStatus('err');
-    updateSyncStatusText(t('❌ 同步失敗：','❌ Sync failed: ') + e.message);
-    console.error('Sync error:', e);
+    updateSyncStatusText('❌ ' + t('同步失敗：','Sync failed: ') + e.message);
   }
 }
 
