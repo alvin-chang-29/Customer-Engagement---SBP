@@ -1,4 +1,4 @@
-const CACHE = 'sbp-v1';
+const CACHE = 'sbp-v14';
 const FILES = ['./index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
