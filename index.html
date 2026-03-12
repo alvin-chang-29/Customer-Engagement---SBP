@@ -376,6 +376,41 @@ a{color:var(--acc)}
 .import-update{color:var(--ylw)}
 .import-keep{color:var(--t2)}
 
+/* Filter bar */
+.filter-bar{display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap}
+.filter-sel{
+  flex:1;min-width:0;padding:7px 10px;font-size:12px;font-weight:600;
+  background:var(--s2);border:1px solid var(--bd2);border-radius:8px;
+  color:var(--t1);cursor:pointer;
+}
+.filter-sel:focus{border-color:var(--acc);outline:none}
+.filter-clear-btn{
+  flex-shrink:0;padding:7px 12px;font-size:12px;font-weight:600;
+  background:var(--s3);color:var(--red);border:1px solid rgba(239,68,68,.3);
+  border-radius:8px;cursor:pointer;white-space:nowrap;
+}
+/* Opp list collapsible header */
+.opp-list-header{
+  display:flex;align-items:center;gap:8px;padding:10px 14px;
+  background:var(--s2);border:1px solid var(--bd2);border-radius:10px;
+  cursor:pointer;margin-bottom:8px;user-select:none;
+  transition:background .2s;
+}
+.opp-list-header:active{background:var(--s3)}
+.opp-list-header span:first-child{font-size:13px;font-weight:600;color:var(--t1);flex:1}
+.opp-list-count{font-size:12px;color:var(--t2);font-family:var(--mono)}
+/* Funnel chart */
+.funnel-wrap{padding:14px 4px 4px}
+.funnel-title{font-size:11px;font-weight:700;letter-spacing:1.5px;color:var(--t3);text-transform:uppercase;margin-bottom:12px;text-align:center}
+.funnel-bar-wrap{margin-bottom:6px}
+.funnel-label{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px}
+.funnel-label-name{font-size:11px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:55%}
+.funnel-label-val{font-size:11px;font-weight:700;font-family:var(--mono);color:var(--t1)}
+.funnel-track{background:var(--s3);border-radius:4px;height:22px;overflow:hidden;position:relative}
+.funnel-fill{height:100%;border-radius:4px;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;font-size:10px;font-weight:700;color:rgba(255,255,255,.9);transition:width .5s cubic-bezier(.4,0,.2,1);min-width:2px}
+.funnel-total{text-align:center;margin-top:10px;font-size:11px;color:var(--t3)}
+.funnel-total span{color:var(--acc);font-weight:700;font-family:var(--mono)}
+
 /* Confirming summary */
 .confirm-box{background:var(--s2);border-left:3px solid var(--acc);border-radius:0 8px 8px 0;padding:12px;margin-bottom:8px}
 .confirm-box-label{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--t3);margin-bottom:6px}
@@ -463,12 +498,36 @@ a{color:var(--acc)}
 <div id="s-home" class="screen active">
   <div class="search-wrap">
     <svg class="search-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-    <input type="text" id="search-input" placeholder="搜尋客戶或機會名稱..." oninput="renderHome()">
+    <input type="text" id="search-input" placeholder="搜尋機會名稱或 Part Number..." oninput="renderHome()">
   </div>
   <div class="filter-chips-wrap">
     <div id="filter-chips" class="filter-chips"></div>
   </div>
+  <!-- 篩選/排序列 -->
+  <div class="filter-bar" id="filter-bar">
+    <select id="filter-stage" onchange="renderHome()" class="filter-sel">
+      <option value="">全部 Stage</option>
+      <option>1-Listen and Learn (Qualify)</option>
+      <option>2-Guided Discovery</option>
+      <option>3-Confirming/Validation</option>
+      <option>4-Recommending</option>
+      <option>5-Final Negotiation</option>
+      <option>6-Committing/Closing</option>
+    </select>
+    <select id="filter-part" onchange="renderHome()" class="filter-sel">
+      <option value="">全部 Part</option>
+    </select>
+    <button class="filter-clear-btn" onclick="clearFilters()" id="filter-clear-btn" style="display:none">✕ 清除</button>
+  </div>
   <div id="home-stats"></div>
+  <!-- Funnel 圖（收合時顯示）-->
+  <div id="home-funnel" style="display:none"></div>
+  <!-- Opp 列表（可收合）-->
+  <div id="home-list-header" class="opp-list-header" onclick="toggleOppList()">
+    <span id="opp-list-title">📋 機會列表</span>
+    <span id="opp-list-count" class="opp-list-count"></span>
+    <svg id="opp-list-arrow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" style="transition:transform .25s"><polyline points="6 9 12 15 18 9"/></svg>
+  </div>
   <div id="home-list"></div>
 </div>
 
@@ -477,6 +536,17 @@ a{color:var(--acc)}
   <div id="prep-context">
     <div id="prep-opp-name">— 選擇機會 —</div>
     <div id="prep-stage-badge"></div>
+    <div style="display:flex;gap:6px;flex-shrink:0">
+      <button class="btn btn-secondary btn-sm" onclick="exportPrepExcel()" title="匯出會前準備 Excel">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span data-zh="匯出" data-en="Export">匯出</span>
+      </button>
+      <button class="btn btn-secondary btn-sm" onclick="document.getElementById('prep-import-file').click()" title="載入會前準備 Excel">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <span data-zh="載入" data-en="Import">載入</span>
+      </button>
+      <input type="file" id="prep-import-file" accept=".csv" style="display:none" onchange="importPrepExcel(this.files[0])">
+    </div>
   </div>
   <div class="tab-bar" id="prep-tabs">
     <button class="tab-btn active" onclick="showPrepTab('info')" data-tab="info" data-zh="📌 基本資訊" data-en="📌 Info">📌 基本資訊</button>
@@ -733,7 +803,7 @@ E,希望達成的關鍵指標?,Key metrics to achieve?,business,H</pre>
 // ─── CONSTANTS ─────────────────────────────────────
 const DB_KEY = 'sbp_v1';
 const GIST_FILENAME = 'sbp_v1.json';
-const APP_VERSION = 'v1.13 (2026-03-12)';
+const APP_VERSION = 'v1.17 (2026-03-12)';
 
 // ─── DEFAULT SCOPE QUESTIONS ────────────────────────
 const DEFAULT_SCOPE = [
@@ -929,174 +999,196 @@ function t(zh, en) { return DB.lang === 'zh' ? zh : en; }
 // ─── HOME SCREEN ─────────────────────────────────────
 function renderHome() {
   const q = (document.getElementById('search-input')?.value || '').toLowerCase();
+  const filterStage = document.getElementById('filter-stage')?.value || '';
+  const filterPart  = document.getElementById('filter-part')?.value  || '';
   const chips = document.getElementById('filter-chips');
-  const list = document.getElementById('home-list');
+  const list  = document.getElementById('home-list');
   const stats = document.getElementById('home-stats');
 
-  // Build customer list
+  // ── Customer chips ──────────────────────────────────
   const customers = [...new Set(DB.opportunities.map(o => o.customer).filter(Boolean))].sort();
-
-  // Render chips with delete buttons
   chips.innerHTML = '';
-
-  // "All" chip (no delete)
   const allWrap = mkEl('div', {class:'chip-wrap'});
   const allChip = mkEl('button', {class:'chip no-del' + (!DB.activeCustomer ? ' active' : '')}, [t('全部','All')]);
   allChip.onclick = () => { DB.activeCustomer = null; renderHome(); };
   allWrap.appendChild(allChip);
   chips.appendChild(allWrap);
-
   customers.forEach(c => {
     const wrap = mkEl('div', {class:'chip-wrap'});
     const chip = mkEl('button', {class:'chip' + (DB.activeCustomer === c ? ' active' : '')}, [shortenCustomer(c)]);
     chip.onclick = () => { DB.activeCustomer = c; renderHome(); };
-    const del = mkEl('button', {class:'chip-del', title: t('刪除客戶','Delete customer')}, ['✕']);
+    const del = mkEl('button', {class:'chip-del', title:t('刪除客戶','Delete customer')}, ['✕']);
     del.onclick = (e) => {
       e.stopPropagation();
-      const oppCount = DB.opportunities.filter(o => o.customer === c).length;
+      const cnt = DB.opportunities.filter(o => o.customer === c).length;
       showConfirm(
-        t(`確定刪除客戶「${c}」及其所有 ${oppCount} 筆專案？此動作無法復原。`,
-          `Delete customer "${c}" and all ${oppCount} opportunities? This cannot be undone.`),
-        () => deleteCustomer(c)
-      );
+        t(`確定刪除客戶「${c}」及其所有 ${cnt} 筆專案？此動作無法復原。`,
+          `Delete customer "${c}" and all ${cnt} opportunities? This cannot be undone.`),
+        () => deleteCustomer(c));
     };
-    wrap.appendChild(chip);
-    wrap.appendChild(del);
+    wrap.appendChild(chip); wrap.appendChild(del);
     chips.appendChild(wrap);
   });
-
-  // Re-init drag scroll (chips were re-rendered)
   initDragScroll(chips);
-
-  // Scroll active chip into view
   setTimeout(() => {
-    const activeChip = chips.querySelector('.chip.active');
-    if (activeChip) activeChip.scrollIntoView({behavior:'smooth', block:'nearest', inline:'center'});
+    const ac = chips.querySelector('.chip.active');
+    if (ac) ac.scrollIntoView({behavior:'smooth', block:'nearest', inline:'center'});
   }, 50);
 
-  // Action bar: add customer + add opp
-  const actionBar = mkEl('div', {class:'home-action-bar'});
-  const addCustBtn = mkEl('button', {class:'btn btn-secondary btn-sm'}, [
-    '＋ ' + t('新增客戶','Add Customer')
-  ]);
-  addCustBtn.onclick = () => showAddCustomerSheet();
-  actionBar.appendChild(addCustBtn);
+  // ── Part Number dropdown (dynamic) ─────────────────
+  const partSel = document.getElementById('filter-part');
+  const allParts = [...new Set(
+    DB.opportunities
+      .filter(o => !DB.activeCustomer || o.customer === DB.activeCustomer)
+      .map(o => o.product).filter(Boolean)
+  )].sort();
+  if (partSel) {
+    const curPart = partSel.value;
+    partSel.innerHTML = '<option value="">' + t('全部 Part','All Parts') + '</option>';
+    allParts.forEach(p => {
+      const opt = mkEl('option', {value:p}, [p]);
+      if (p === curPart) opt.selected = true;
+      partSel.appendChild(opt);
+    });
+  }
 
-  const addOppBtn = mkEl('button', {class:'btn btn-secondary btn-sm'}, [
-    '＋ ' + t('新增專案','Add Opportunity')
-  ]);
-  addOppBtn.onclick = () => showAddOppSheet(DB.activeCustomer || '');
-  actionBar.appendChild(addOppBtn);
-  stats.innerHTML = '';
-  stats.appendChild(actionBar);
+  // Show/hide clear button
+  const clearBtn = document.getElementById('filter-clear-btn');
+  if (clearBtn) clearBtn.style.display = (filterStage || filterPart || q) ? 'block' : 'none';
 
-  // Filter
+  // ── Apply filters ───────────────────────────────────
   let filtered = DB.opportunities;
   if (DB.activeCustomer) filtered = filtered.filter(o => o.customer === DB.activeCustomer);
   if (q) filtered = filtered.filter(o =>
     (o.name||'').toLowerCase().includes(q) ||
-    (o.customer||'').toLowerCase().includes(q) ||
     (o.product||'').toLowerCase().includes(q)
   );
+  if (filterStage) filtered = filtered.filter(o => (o.stage||'') === filterStage);
+  if (filterPart)  filtered = filtered.filter(o => (o.product||'') === filterPart);
 
-  // Stats row
+  // ── Action bar ─────────────────────────────────────
   const active = filtered.filter(o => !o.historical);
   const totalPipe = active.reduce((s, o) => s + (parseFloat(o.price)||0), 0);
-  const statRow = mkEl('div', {class:'stat-row'}, [
-    mkEl('div', {class:'stat-box'}, [
-      mkEl('div', {class:'stat-num'}, [active.length.toString()]),
-      mkEl('div', {class:'stat-lbl'}, [t('進行中機會','Active Opps')])
-    ]),
-    mkEl('div', {class:'stat-box'}, [
-      mkEl('div', {class:'stat-num'}, ['$' + fmtPrice(totalPipe)]),
-      mkEl('div', {class:'stat-lbl'}, [t('Pipeline 總金額','Total Pipeline')])
-    ]),
-    mkEl('div', {class:'stat-box'}, [
-      mkEl('div', {class:'stat-num'}, [filtered.filter(o=>o.historical).length.toString()]),
-      mkEl('div', {class:'stat-lbl'}, [t('歷史案子','Historical')])
-    ]),
-  ]);
-  stats.appendChild(statRow);
+  stats.innerHTML = '';
+  const actionBar = mkEl('div', {class:'home-action-bar'});
+  const addCustBtn = mkEl('button', {class:'btn btn-secondary btn-sm'}, ['+ ' + t('新增客戶','Add Customer')]);
+  addCustBtn.onclick = () => showAddCustomerSheet();
+  const addOppBtn = mkEl('button', {class:'btn btn-secondary btn-sm'}, ['+ ' + t('新增專案','Add Opportunity')]);
+  addOppBtn.onclick = () => showAddOppSheet(DB.activeCustomer || '');
+  actionBar.appendChild(addCustBtn); actionBar.appendChild(addOppBtn);
+  stats.appendChild(actionBar);
 
-  // Stage bar
-  const stageCounts = {};
-  active.forEach(o => { const s = stageNum(o.stage); stageCounts[s] = (stageCounts[s]||0) + 1; });
-  if (active.length > 0) {
-    const barWrap = mkEl('div', {style:'margin-bottom:12px'});
-    const bar = mkEl('div', {class:'stage-bar'});
-    const stageColors = {1:'#4a5578',2:'#1e5a8a',3:'#7c5a00',4:'#7c5a00',5:'#8a3500',6:'#166534'};
-    [1,2,3,4,5,6].forEach(n => {
-      if (stageCounts[n]) {
-        const seg = mkEl('div', {class:'stage-seg', style:`width:${stageCounts[n]/active.length*100}%;background:${stageColors[n]||'#4a5578'}`});
-        bar.appendChild(seg);
-      }
-    });
-    barWrap.appendChild(bar);
-    const legend = mkEl('div', {style:'display:flex;gap:6px;flex-wrap:wrap;margin-top:5px'});
-    Object.entries(stageCounts).sort().forEach(([n,cnt]) => {
-      const tag = mkEl('span', {style:'font-size:10px;color:var(--t3)'}, [`Stage ${n}: ${cnt}`]);
-      legend.appendChild(tag);
-    });
-    barWrap.appendChild(legend);
-    stats.appendChild(barWrap);
-  }
+  stats.appendChild(mkEl('div', {class:'stat-row'}, [
+    mkEl('div', {class:'stat-box'}, [mkEl('div', {class:'stat-num'}, [active.length.toString()]), mkEl('div', {class:'stat-lbl'}, [t('進行中機會','Active Opps')])]),
+    mkEl('div', {class:'stat-box'}, [mkEl('div', {class:'stat-num'}, ['$'+fmtPrice(totalPipe)]), mkEl('div', {class:'stat-lbl'}, [t('Pipeline 總金額','Total Pipeline')])]),
+    mkEl('div', {class:'stat-box'}, [mkEl('div', {class:'stat-num'}, [filtered.filter(o=>o.historical).length.toString()]), mkEl('div', {class:'stat-lbl'}, [t('歷史案子','Historical')])]),
+  ]));
 
-  // List
+  // ── Funnel (when collapsed) ─────────────────────────
+  renderFunnel(active);
+
+  // ── List header toggle ──────────────────────────────
+  const listCount = document.getElementById('opp-list-count');
+  const listArrow = document.getElementById('opp-list-arrow');
+  if (listCount) listCount.textContent = filtered.length + ' ' + t('筆','items');
+  const collapsed = DB.oppListCollapsed || false;
+  if (listArrow) listArrow.style.transform = collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
+  list.style.display = collapsed ? 'none' : 'block';
+  document.getElementById('home-funnel').style.display = collapsed ? 'block' : 'none';
+
+  // ── Opp list ────────────────────────────────────────
   list.innerHTML = '';
   if (filtered.length === 0) {
     list.appendChild(mkEl('div', {class:'empty'}, [
       mkEl('div', {class:'empty-icon'}, ['📭']),
-      mkEl('div', {class:'empty-text'}, [t('沒有找到機會\n點擊「＋ 新增專案」手動新增，\n或到設定頁匯入 SFDC Excel','No opportunities found.\nClick "+ Add Opportunity" or\nimport SFDC Excel in Settings')])
+      mkEl('div', {class:'empty-text'}, [t('沒有找到機會','No opportunities found')])
     ]));
     return;
   }
-
-  // Sort: active first, then by stage desc
   filtered.sort((a,b) => {
     if (a.historical !== b.historical) return a.historical ? 1 : -1;
     return stageNum(b.stage) - stageNum(a.stage);
   });
-
   filtered.forEach(opp => {
-    // Wrapper for positioning delete button
     const wrap = mkEl('div', {class:'opp-card-wrap'});
-
     const card = mkEl('div', {class:'opp-card' + (opp.historical?' inactive':'')});
     const name = mkEl('div', {class:'opp-name'}, [opp.name || t('（未命名）','(Unnamed)')]);
     const meta = mkEl('div', {class:'opp-meta'});
-
-    const badge = mkEl('span', {class:'badge badge-' + stageBadgeClass(opp.stage)}, [opp.stage || '?']);
-    meta.appendChild(badge);
-
-    if (opp.historical) {
-      meta.appendChild(mkEl('span', {class:'badge badge-old'}, [t('歷史','Historical')]));
-    }
-    if (opp.product) meta.appendChild(mkEl('span', {class:'opp-part'}, [opp.product]));
-    if (opp.price)   meta.appendChild(mkEl('span', {class:'opp-price'}, ['$' + fmtPrice(opp.price)]));
-    if (opp.freezeDate) meta.appendChild(mkEl('span', {class:'opp-date'}, ['📅 ' + opp.freezeDate]));
-    const mtgCount = (opp.meetings||[]).length;
-    if (mtgCount > 0) meta.appendChild(mkEl('span', {class:'opp-date'}, ['💬 ' + mtgCount]));
-
-    card.appendChild(name);
-    card.appendChild(meta);
+    meta.appendChild(mkEl('span', {class:'badge badge-' + stageBadgeClass(opp.stage)}, [opp.stage || '?']));
+    if (opp.historical) meta.appendChild(mkEl('span', {class:'badge badge-old'}, [t('歷史','Historical')]));
+    if (opp.product)    meta.appendChild(mkEl('span', {class:'opp-part'}, [opp.product]));
+    if (opp.price)      meta.appendChild(mkEl('span', {class:'opp-price'}, ['$'+fmtPrice(opp.price)]));
+    if (opp.freezeDate) meta.appendChild(mkEl('span', {class:'opp-date'}, ['📅 '+opp.freezeDate]));
+    const mc = (opp.meetings||[]).length;
+    if (mc > 0) meta.appendChild(mkEl('span', {class:'opp-date'}, ['💬 '+mc]));
+    card.appendChild(name); card.appendChild(meta);
     card.onclick = () => openOppPrep(opp.id);
-
-    // Delete button (top-right, stops card click)
-    const delBtn = mkEl('button', {class:'opp-del-btn', title: t('刪除此專案','Delete opportunity')}, ['🗑']);
+    const delBtn = mkEl('button', {class:'opp-del-btn', title:t('刪除','Delete')}, ['🗑']);
     delBtn.onclick = (e) => {
       e.stopPropagation();
-      showConfirm(
-        t(`確定刪除專案「${opp.name}」？\n所有會議記錄與備註將一併刪除，此動作無法復原。`,
-          `Delete opportunity "${opp.name}"?\nAll meeting records and notes will be deleted. Cannot be undone.`),
-        () => deleteOpp(opp.id)
-      );
+      showConfirm(t('確定刪除專案「'+opp.name+'」？此動作無法復原。', 'Delete "'+opp.name+'"? Cannot be undone.'), () => deleteOpp(opp.id));
     };
-
-    wrap.appendChild(card);
-    wrap.appendChild(delBtn);
+    wrap.appendChild(card); wrap.appendChild(delBtn);
     list.appendChild(wrap);
   });
 }
+
+function clearFilters() {
+  const s = document.getElementById('filter-stage');
+  const p = document.getElementById('filter-part');
+  const q = document.getElementById('search-input');
+  if (s) s.value = '';
+  if (p) p.value = '';
+  if (q) q.value = '';
+  renderHome();
+}
+
+function toggleOppList() {
+  DB.oppListCollapsed = !DB.oppListCollapsed;
+  renderHome();
+}
+
+function renderFunnel(activeOpps) {
+  const container = document.getElementById('home-funnel');
+  if (!container) return;
+  container.innerHTML = '';
+  const STAGE_META = [
+    {n:1, label:'1 - Listen & Learn',      color:'#3b5270'},
+    {n:2, label:'2 - Guided Discovery',     color:'#1e5a8a'},
+    {n:3, label:'3 - Confirming',           color:'#7c6500'},
+    {n:4, label:'4 - Recommending',         color:'#8a5200'},
+    {n:5, label:'5 - Final Negotiation',    color:'#8a3500'},
+    {n:6, label:'6 - Committing/Closing',   color:'#166534'},
+  ];
+  const byStage = STAGE_META.map(sm => {
+    const opps = activeOpps.filter(o => stageNum(o.stage) === sm.n);
+    const total = opps.reduce((s,o) => s + (parseFloat(o.price)||0), 0);
+    return {...sm, count:opps.length, total};
+  }).filter(s => s.count > 0);
+  if (byStage.length === 0) return;
+  const maxTotal = Math.max(...byStage.map(s => s.total));
+  const grandTotal = byStage.reduce((s,x) => s + x.total, 0);
+  const wrap = mkEl('div', {class:'funnel-wrap'});
+  wrap.appendChild(mkEl('div', {class:'funnel-title'}, [t('Pipeline Funnel（按 Stage）','Pipeline Funnel by Stage')]));
+  [...byStage].reverse().forEach(s => {
+    const pct = maxTotal > 0 ? Math.max(s.total / maxTotal * 100, 4) : 4;
+    const bw = mkEl('div', {class:'funnel-bar-wrap'});
+    const lbl = mkEl('div', {class:'funnel-label'});
+    lbl.appendChild(mkEl('span', {class:'funnel-label-name'}, [s.label]));
+    lbl.appendChild(mkEl('span', {class:'funnel-label-val'}, [s.count + t('件','') + ' · $' + fmtPrice(s.total)]));
+    bw.appendChild(lbl);
+    const track = mkEl('div', {class:'funnel-track'});
+    const fill = mkEl('div', {class:'funnel-fill', style:'width:'+pct+'%;background:'+s.color});
+    if (pct > 15) fill.textContent = Math.round(s.total/grandTotal*100) + '%';
+    track.appendChild(fill);
+    bw.appendChild(track);
+    wrap.appendChild(bw);
+  });
+  wrap.appendChild(mkEl('div', {class:'funnel-total'}, [t('總計：','Total: '), mkEl('span', {}, ['$'+fmtPrice(grandTotal)]), ' · ' + activeOpps.length + ' ' + t('筆','items')]));
+  container.appendChild(wrap);
+}
+
+
 
 function openOppPrep(oppId) {
   DB.currentOppId = oppId;
@@ -1961,6 +2053,191 @@ function importSFDC(file) {
 }
 
 // ─── EXPORT ──────────────────────────────────────────
+// ─── 會前準備 匯出 / 載入 ──────────────────────────────
+function exportPrepExcel() {
+  const opp = getOpp(DB.currentOppId);
+  if (!opp) { showToast(t('請先選擇一個機會', 'Please select an opportunity first')); return; }
+
+  const prep = ensurePrep(opp);
+
+  // Ask for filename
+  const defaultName = (opp.name||'MeetingPrep').replace(/[\\/:*?"<>|]/g,'_').substring(0,50);
+  const fname = prompt(t('請輸入檔案名稱（不含副檔名）：', 'Enter file name (without extension):'), defaultName);
+  if (fname === null) return;
+
+  // CSV helper: wrap cell value (escape quotes, handle newlines)
+  const csvCell = v => {
+    const s = (v||'').replace(/"/g,'""');
+    return (s.includes(',') || s.includes('\n') || s.includes('"')) ? `"${s}"` : s;
+  };
+  const row = (...cols) => cols.map(csvCell).join(',') + '\r\n';
+
+  let csv = '\uFEFF'; // BOM for Excel UTF-8
+
+  // ── Header info ──
+  csv += row('SBP 會前準備 / Meeting Preparation','');
+  csv += row('機會名稱 Opportunity', opp.name);
+  csv += row('客戶 Customer', opp.customer);
+  csv += row('Part Number', opp.product);
+  csv += row('Stage', opp.stage);
+  csv += row('Freeze Date', opp.freezeDate);
+  csv += row('匯出時間 Exported', new Date().toLocaleString());
+  csv += row('','');
+
+  // ── Section 1: Due Diligence ──
+  csv += row('[DUE_DILIGENCE]','');
+  csv += row('技術/營運 Technical/Operational',  prep.dueDiligence.technical  || '');
+  csv += row('商業/市場 Business/Market',         prep.dueDiligence.business   || '');
+  csv += row('政治/組織 Political/Organizational',prep.dueDiligence.political  || '');
+  csv += row('個人/關係 Personal/Relationship',   prep.dueDiligence.personal   || '');
+  csv += row('','');
+
+  // ── Section 2: 4-Step Start ──
+  csv += row('[4_STEP_START]','');
+  csv += row('P — Purpose 目的',  prep.fourStep.purpose || '');
+  csv += row('P — Plan 計畫',     prep.fourStep.plan    || '');
+  csv += row('O — Outcome 成果',  prep.fourStep.outcome || '');
+  csv += row('C — Check 確認',    prep.fourStep.check   || '');
+  csv += row('','');
+
+  // ── Section 3: SCOPE ──
+  csv += row('[SCOPE]','','','','','','');
+  csv += row('category','question_zh','question_en','priority','done','starred','note');
+  const qs = (prep.scopeQuestions && prep.scopeQuestions.length > 0) ? prep.scopeQuestions : DEFAULT_SCOPE;
+  qs.forEach(q => {
+    csv += row(
+      q.cat || '',
+      q.zh  || q.question_zh  || '',
+      q.en  || q.question_en  || '',
+      q.priority || 'M',
+      q.done    ? 'TRUE' : 'FALSE',
+      q.starred ? 'TRUE' : 'FALSE',
+      q.note || ''
+    );
+  });
+  csv += row('','');
+
+  // ── Section 4: Guided Discovery ──
+  csv += row('[GUIDED_DISCOVERY]','');
+  csv += row('我方獨特優勢 Our Unique Strengths',      prep.guidedDiscovery.strengths    || '');
+  csv += row('替代方案分析 Alternative Approaches',    prep.guidedDiscovery.alternatives || '');
+  csv += row('引導式問題 Guided Questions',             prep.guidedDiscovery.questions    || '');
+  csv += row('','');
+
+  // ── Section 5: Confirming ──
+  csv += row('[CONFIRMING]','');
+  csv += row('S — 現況 Situation',             prep.confirming.situation    || '');
+  csv += row('C — 後果 Consequences',          prep.confirming.consequences || '');
+  csv += row('O — 障礙 Obstacles',             prep.confirming.obstacles    || '');
+  csv += row('P — 偏好 Preferences',           prep.confirming.preferences  || '');
+  csv += row('E — 預期成果 Expected Results',  prep.confirming.expected     || '');
+
+  const filename = (fname.trim() || defaultName) + '.csv';
+  const blob = new Blob([csv], {type: 'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  showToast(t('✅ 已匯出：' + filename + '（可用 Excel 開啟編輯）', '✅ Exported: ' + filename));
+}
+
+function importPrepExcel(file) {
+  if (!file) return;
+  const opp = getOpp(DB.currentOppId);
+  if (!opp) { showToast(t('請先選擇一個機會', 'Please select an opportunity first')); return; }
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const raw = e.target.result.replace(/^\uFEFF/, ''); // strip BOM
+    const prep = ensurePrep(opp);
+    let importedCount = 0;
+
+    // Parse CSV lines → array of cell arrays
+    const lines = raw.split(/\r?\n/);
+    const parsedRows = lines.map(line => parseCSVLine(line));
+
+    let section = '';
+    const scopeRows = [];
+
+    parsedRows.forEach(cells => {
+      const col0 = (cells[0]||'').trim();
+      const col1 = (cells[1]||'').trim();
+
+      // ── Section detection ──
+      if (col0 === '[DUE_DILIGENCE]')    { section = 'dd';          return; }
+      if (col0 === '[4_STEP_START]')     { section = 'start';       return; }
+      if (col0 === '[SCOPE]')            { section = 'scope';       return; }
+      if (col0 === '[GUIDED_DISCOVERY]') { section = 'gd';          return; }
+      if (col0 === '[CONFIRMING]')       { section = 'confirming';  return; }
+
+      // Skip blank rows and header rows before first section
+      if (!col0 && !col1) return;
+      if (!section) return;
+
+      const lbl = col0.toLowerCase();
+      const val = col1; // CSV values are already plain text
+
+      if (section === 'dd') {
+        if      (lbl.includes('技術') || lbl.includes('technical'))  { prep.dueDiligence.technical  = val; importedCount++; }
+        else if (lbl.includes('商業') || lbl.includes('business'))   { prep.dueDiligence.business   = val; importedCount++; }
+        else if (lbl.includes('政治') || lbl.includes('political'))  { prep.dueDiligence.political  = val; importedCount++; }
+        else if (lbl.includes('個人') || lbl.includes('personal'))   { prep.dueDiligence.personal   = val; importedCount++; }
+
+      } else if (section === 'start') {
+        if      (lbl.includes('purpose') || lbl.includes('目的')) { prep.fourStep.purpose = val; importedCount++; }
+        else if (lbl.includes('plan')    || lbl.includes('計畫')) { prep.fourStep.plan    = val; importedCount++; }
+        else if (lbl.includes('outcome') || lbl.includes('成果')) { prep.fourStep.outcome = val; importedCount++; }
+        else if (lbl.includes('check')   || lbl.includes('確認')) { prep.fourStep.check   = val; importedCount++; }
+
+      } else if (section === 'scope') {
+        if (col0 === 'category') return; // skip header row
+        const cat = col0.toUpperCase().trim();
+        if (!['S','C','O','P','E'].includes(cat)) return;
+        scopeRows.push({
+          id:       'imp_' + Date.now() + '_' + scopeRows.length,
+          cat,
+          zh:       cells[1] || '',
+          en:       cells[2] || '',
+          priority: (cells[3] || 'M').toUpperCase().trim(),
+          done:     (cells[4]||'').toUpperCase() === 'TRUE',
+          starred:  (cells[5]||'').toUpperCase() === 'TRUE',
+          note:     cells[6] || '',
+        });
+
+      } else if (section === 'gd') {
+        if      (lbl.includes('優勢') || lbl.includes('strength'))  { prep.guidedDiscovery.strengths    = val; importedCount++; }
+        else if (lbl.includes('替代') || lbl.includes('altern'))    { prep.guidedDiscovery.alternatives = val; importedCount++; }
+        else if (lbl.includes('引導') || lbl.includes('question'))  { prep.guidedDiscovery.questions    = val; importedCount++; }
+
+      } else if (section === 'confirming') {
+        if      (lbl.includes('現況') || lbl.includes('situation'))   { prep.confirming.situation    = val; importedCount++; }
+        else if (lbl.includes('後果') || lbl.includes('consequence')) { prep.confirming.consequences = val; importedCount++; }
+        else if (lbl.includes('障礙') || lbl.includes('obstacle'))    { prep.confirming.obstacles    = val; importedCount++; }
+        else if (lbl.includes('偏好') || lbl.includes('preference'))  { prep.confirming.preferences  = val; importedCount++; }
+        else if (lbl.includes('預期') || lbl.includes('expected'))    { prep.confirming.expected     = val; importedCount++; }
+      }
+    });
+
+    if (scopeRows.length > 0) {
+      prep.scopeQuestions = scopeRows;
+      importedCount += scopeRows.length;
+    }
+
+    if (importedCount === 0) {
+      showToast(t('⚠️ 找不到可解析的內容，請確認是由 SBP App 匯出的 .csv 檔案',
+                  '⚠️ No content found. Please use a .csv file exported by SBP App'), 4000);
+      document.getElementById('prep-import-file').value = '';
+      return;
+    }
+
+    saveDB();
+    showPrepTab(currentPrepTab);
+    showToast(t(`✅ 載入成功，共匯入 ${importedCount} 筆資料`, `✅ Imported ${importedCount} fields`), 3000);
+    document.getElementById('prep-import-file').value = '';
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
 function exportSFDCReport() {
   const opps = DB.opportunities.filter(o => !o.historical);
   let html = '<html><head><meta charset="UTF-8"></head><body><table border="1">';
