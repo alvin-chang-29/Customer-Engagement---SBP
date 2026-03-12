@@ -577,6 +577,20 @@ E,希望達成的關鍵指標?,Key metrics to achieve?,business,H</pre>
       <span data-zh="🗑️ 清除所有資料" data-en="🗑️ Clear All Data">🗑️ 清除所有資料</span>
     </button>
   </div>
+
+  <div class="section-label" data-zh="版本資訊" data-en="Version">版本資訊</div>
+  <div class="card">
+    <div class="settings-row" style="border:none;padding:8px 0">
+      <div>
+        <div class="settings-label">SBP App</div>
+        <div class="settings-sub">Sales Beyond Product</div>
+      </div>
+      <div id="app-version-display" class="settings-value" style="font-size:12px"></div>
+    </div>
+    <div style="font-size:11px;color:var(--t3);margin-top:4px">
+      同步模式：<span style="color:var(--grn)">手動同步</span>（關閉分頁時自動同步一次）
+    </div>
+  </div>
 </div>
 
 </div><!-- /screens -->
@@ -719,6 +733,7 @@ E,希望達成的關鍵指標?,Key metrics to achieve?,business,H</pre>
 // ─── CONSTANTS ─────────────────────────────────────
 const DB_KEY = 'sbp_v1';
 const GIST_FILENAME = 'sbp_v1.json';
+const APP_VERSION = 'v1.13 (2026-03-12)';
 
 // ─── DEFAULT SCOPE QUESTIONS ────────────────────────
 const DEFAULT_SCOPE = [
@@ -808,6 +823,8 @@ function initApp() {
   renderNotesOppSelect();
   document.getElementById('gist-token').value = DB.gist.token || '';
   document.getElementById('gist-id').value = DB.gist.gistId || '';
+  const vEl = document.getElementById('app-version-display');
+  if (vEl) vEl.textContent = APP_VERSION;
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(()=>{});
   }
